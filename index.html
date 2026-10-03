@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bulk Certificate Generator (Static)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Bulk Certificate Generator for KPE Society's Dr. G.M. Patil Law College.">
+  <meta name="author" content="NK">
+  <title>Bulk Certificate Generator</title>
   <!-- Include jsPDF and JSZip via CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -20,26 +22,38 @@
     button:disabled { background-color: #9e9e9e; cursor: not-allowed; }
     button:hover:not(:disabled) { background-color: #512da8; }
     .status { text-align: center; margin-top: 20px; font-weight: bold; color: #2e7d32; }
+    @media (max-width: 600px) { body { padding: 10px; } .container { padding: 20px 15px; border-top-width: 6px; } h2 { font-size: 20px; } }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h2>Bulk Certificate Generator</h2>
-  <p class="subtitle">Instant client-side generation. Paste names below for fast bulk downloads.</p>
-  <hr style="border: 0; height: 1px; background: #eee; margin-bottom: 25px;">
   
-  <form id="bulkForm" onsubmit="generateCertificates(event)">
-    <div class="form-group">
-      <label for="namesInput">Participant Names *</label>
-      <textarea id="namesInput" placeholder="John Doe, Jane Smith, Alex Jones&#10;Or paste column from spreadsheet line by line..." required></textarea>
-      <div class="hint">Processes hundreds of names in seconds without server limits.</div>
-    </div>
+  <div style="text-align: center; margin-bottom: 20px;">
+    <img src="https://lh3.googleusercontent.com/d/1DvGVrzdTzNnBgBzpCLzXCv2qVK-SC8V6" alt="College Logo" style="max-height: 100px; max-width: 100%;">
+  </div>
+
+  <div id="formScreen">
+    <h2>Bulk Certificate Generator</h2>
+    <p class="subtitle">Paste names separated by commas or newlines to generate certificates instantly.</p>
+    <hr style="border: 0; height: 1px; background: #eee; margin-bottom: 25px;">
     
-    <button type="submit" id="submitBtn">Generate & Download ZIP</button>
-    <div id="statusMsg" class="status"></div>
-  </form>
+    <form id="bulkForm" onsubmit="generateCertificates(event)">
+      <div class="form-group">
+        <label for="namesInput">Participant Names *</label>
+        <textarea id="namesInput" placeholder="John Doe, Jane Smith, Alex Jones&#10;Or paste column from spreadsheet line by line..." required></textarea>
+        <div class="hint">Single names download as individual PDFs. Multiple names package into a ZIP archive automatically.</div>
+      </div>
+      
+      <button type="submit" id="submitBtn">Generate & Download Certificates</button>
+      <div id="statusMsg" class="status"></div>
+    </form>
+  </div>
+
 </div>
+
+<!-- Hidden image container to load your template background -->
+<img id="templateImage" src="certificateGenerator.jpg" style="display:none;" alt="Template">
 
 <script>
   async function generateCertificates(e) {
@@ -57,10 +71,21 @@
 
     btn.disabled = true;
     statusMsg.style.color = '#2e7d32';
-    statusMsg.innerText = `Preparing 0 / ${names.length} certificates...`;
+    statusMsg.innerText = `Preparing certificates...`;
 
     const { jsPDF } = window.jspdf;
     const zip = new JSZip();
+    const imgElement = document.getElementById('templateImage');
+
+    // Convert image element to base64 data URL for jsPDF embedding
+    const canvas = document.createElement('canvas');
+    canvas.width = imgElement.naturalWidth || 1200;
+    canvas.height = imgElement.naturalHeight || 850;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgElement, 0, 0);
+    const bgDataURL = canvas.toDataURL('image/jpeg', 0.95);
+
+    const pdfBlobs = [];
 
     for (let i = 0; i < names.length; i++) {
       let rawName = names[i];
@@ -68,42 +93,58 @@
       
       statusMsg.innerText = `Processing (${i + 1}/${names.length}): ${cleanName}`;
 
-      // Initialize landscape A4 PDF
+      // Initialize landscape A4 PDF (297mm x 210mm)
       const doc = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4'
       });
 
-      // Optional: Add background image (e.g., your certificate design layout)
-      // doc.addImage('certificate-bg.png', 'PNG', 0, 0, 297, 210);
+      // Draw background certificate image to fill exact A4 page size
+      doc.addImage(bgDataURL, 'JPEG', 0, 0, 297, 210);
 
-      // Add Name Text dynamically (Adjust X, Y coordinates to align with your template text box)
+      // Configure font styling for participant name matching certificate aesthetic
       doc.setFont("Helvetica", "bold");
-      doc.setFontSize(32);
-      doc.setTextColor(33, 33, 33);
+      doc.setFontSize(20);
+      doc.setTextColor(26, 26, 26);
       
-      // Center text horizontally on A4 Landscape (Width = 297mm)
-      doc.text(cleanName, 297 / 2, 110, { align: 'center' });
+      // Target coordinates matching the line: "This is to certify that [Name] has participated"
+      // X = 172mm (centered roughly between 'that' and 'has participated'), Y = 58.5mm
+      doc.text(cleanName, 172, 58.5, { align: 'center' });
 
-      // Output PDF as ArrayBuffer
-      const pdfBlob = doc.output('arraybuffer');
-      zip.file(`${cleanName}_Certificate.pdf`, pdfBlob);
+      const pdfArrayBuffer = doc.output('arraybuffer');
+      
+      if (names.length === 1) {
+        // Single file return format
+        pdfBlobs.push({ name: cleanName + '_Certificate.pdf', data: pdfArrayBuffer });
+      } else {
+        zip.file(`${cleanName}_Certificate.pdf`, pdfArrayBuffer);
+      }
     }
 
-    statusMsg.innerText = "Compressing files into ZIP archive...";
-    
-    // Generate ZIP file and trigger download
-    zip.generateAsync({ type: 'blob' }).then(function(content) {
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(content);
-      link.download = 'Certificates.zip';
-      document.link = link;
-      link.click();
-      
-      statusMsg.innerText = "✅ All certificates successfully downloaded!";
+    if (names.length === 1) {
+      // Direct single PDF download
+      const blob = new Blob([pdfBlobs[0].data], { type: 'application/pdf' });
+      triggerDownload(blob, pdfBlobs[0].name);
+      statusMsg.innerText = "✅ Certificate successfully downloaded!";
       btn.disabled = false;
-    });
+    } else {
+      statusMsg.innerText = "Compressing files into ZIP archive...";
+      zip.generateAsync({ type: 'blob' }).then(function(content) {
+        triggerDownload(content, 'Certificates.zip');
+        statusMsg.innerText = "✅ All certificates successfully downloaded!";
+        btn.disabled = false;
+      });
+    }
+  }
+
+  function triggerDownload(blob, filename) {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 </script>
 
