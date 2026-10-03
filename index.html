@@ -16,8 +16,11 @@
     p.subtitle { text-align: center; color: #555; font-size: 14px; margin-bottom: 25px; }
     .form-group { margin-bottom: 25px; }
     label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 15px; }
-    textarea { width: 100%; height: 160px; padding: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; resize: vertical; }
+    textarea { width: 100%; height: 140px; padding: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; resize: vertical; }
     .hint { font-size: 12px; color: #6c757d; margin-top: 6px; }
+    .checkbox-group { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #ddd; }
+    .checkbox-group input { width: 18px; height: 18px; cursor: pointer; }
+    .checkbox-group label { margin-bottom: 0; cursor: pointer; font-weight: normal; font-size: 14px; }
     button { background-color: #673ab7; color: white; padding: 14px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; transition: background-color 0.3s; margin-top: 10px; }
     button:disabled { background-color: #9e9e9e; cursor: not-allowed; }
     button:hover:not(:disabled) { background-color: #512da8; }
@@ -44,6 +47,11 @@
         <textarea id="namesInput" placeholder="John Doe, Jane Smith, Alex Jones&#10;Or paste column from spreadsheet line by line..." required></textarea>
         <div class="hint">Single names download as individual PDFs. Multiple names package into a ZIP archive automatically.</div>
       </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="debugGrid">
+        <label for="debugGrid">Enable Coordinate Grid Overlay (uncheck for production use)</label>
+      </div>
       
       <button type="submit" id="submitBtn">Generate & Download Certificates</button>
       <div id="statusMsg" class="status"></div>
@@ -53,11 +61,10 @@
 </div>
 
 <script>
-  // Preload the background image safely when the page opens
   let bgDataURL = null;
   const img = new Image();
   img.crossOrigin = "anonymous";
-  img.src = "certificateGenerator.jpg"; // Make sure this matches your exact filename in GitHub repo
+  img.src = "certificateGenerator.jpg";
   
   img.onload = function() {
     const canvas = document.createElement('canvas');
@@ -72,10 +79,11 @@
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     const statusMsg = document.getElementById('statusMsg');
+    const showGrid = document.getElementById('debugGrid').checked;
     
     if (!bgDataURL) {
       statusMsg.style.color = '#d32f2f';
-      statusMsg.innerText = "Error: Template background image is still loading or filename is incorrect. Please wait 3 seconds and try again.";
+      statusMsg.innerText = "Error: Template background image is still loading. Please wait 3 seconds and try again.";
       return;
     }
 
@@ -102,23 +110,45 @@
       
       statusMsg.innerText = `Processing (${i + 1}/${names.length}): ${cleanName}`;
 
-      // Initialize landscape A4 PDF (297mm x 210mm)
+      // Initialize landscape A4 PDF (Width = 297mm, Height = 210mm)
       const doc = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4'
       });
 
-      // Draw background certificate image over A4 page size
+      // 1. Draw background certificate image over A4 page size
       doc.addImage(bgDataURL, 'JPEG', 0, 0, 297, 210);
 
-      // Configure font styling
+      // 2. Optional Grid Overlay for Calibration
+      if (showGrid) {
+        doc.setLineWidth(0.2);
+        doc.setFontSize(6);
+        doc.setTextColor(150, 150, 150);
+
+        for (let x = 0; x <= 297; x += 10) {
+          doc.setDrawColor(x % 50 === 0 ? 200 : 230, x % 50 === 0 ? 0 : 230, 230);
+          doc.line(x, 0, x, 210);
+          if (x % 20 === 0) doc.text(x.toString(), x + 1, 4);
+        }
+
+        for (let y = 0; y <= 210; y += 10) {
+          doc.setDrawColor(y % 50 === 0 ? 200 : 230, 230, y % 50 === 0 ? 230 : 230);
+          doc.line(0, y, 297, y);
+          if (y % 20 === 0) doc.text(y.toString(), 2, y - 1);
+        }
+      }
+
+      // 3. Configure font styling (Bold and Center-Aligned)
       doc.setFont("Helvetica", "bold");
-      doc.setFontSize(20);
+      doc.setFontSize(22);
       doc.setTextColor(26, 26, 26);
       
-      // Name coordinates matching template line: X = 172mm, Y = 58.5mm
-      doc.text(cleanName, 148, 125, { align: 'center' });
+      // Defined coordinate variables based on converted element positioning
+      const nameX = 84.5; 
+      const nameY = 92.5;
+      
+      doc.text(cleanName, nameX, nameY, { align: 'center' });
 
       const pdfArrayBuffer = doc.output('arraybuffer');
       
