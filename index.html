@@ -139,14 +139,14 @@
         }
       }
 
-      // 3. Configure font styling (Times-Bold, Centered, optimized size to prevent overlap)
+      // 3. Configure font styling (Times-Bold, Centered, optimized size)
       doc.setFont("Times", "bold");
       doc.setFontSize(18);
       doc.setTextColor(26, 26, 26);
       
-      // Adjusted positioning coordinates to sit precisely inside the empty line gap
+      // Adjusted positioning coordinates to sit perfectly centered in the blank line space
       const nameX = 148.5; // Exact horizontal center of A4 landscape (297mm / 2)
-      const nameY = 125.0; // Lowered vertical line placement to rest squarely on the blank space
+      const nameY = 127.5; // Nudged down slightly for ideal alignment
       
       doc.text(cleanName, nameX, nameY, { align: 'center' });
 
