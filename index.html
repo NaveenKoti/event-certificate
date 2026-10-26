@@ -38,13 +38,13 @@
 
   <div id="formScreen">
     <h2>Bulk Certificate Generator</h2>
-    <p class="subtitle">Paste names separated by commas or newlines to generate certificates instantly.</p>
+    <p class="subtitle">Paste names separated by newlines to generate certificates instantly.</p>
     <hr style="border: 0; height: 1px; background: #eee; margin-bottom: 25px;">
     
     <form id="bulkForm" onsubmit="generateCertificates(event)">
       <div class="form-group">
         <label for="namesInput">Participant Names *</label>
-        <textarea id="namesInput" placeholder="John Doe, Jane Smith, Alex Jones&#10;Or paste column from spreadsheet line by line..." required></textarea>
+        <textarea id="namesInput" placeholder="Dr. Srinivas C. Palakonda of KLE Society's S.A. Manvi Law College, Gadag,&#10;Miss Suchithra J. of Christ Academy Institute of Law, Bangalore," required></textarea>
         <div class="hint">Single names download as individual PDFs. Multiple names package into a ZIP archive automatically.</div>
       </div>
 
@@ -88,7 +88,9 @@
     }
 
     const rawInput = document.getElementById('namesInput').value.trim();
-    let names = rawInput.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
+    
+    // FIX APPLIED HERE: Split strictly by lines (newlines), preserving full comma strings per line
+    let names = rawInput.split(/\r?\n/).map(n => n.trim()).filter(n => n.length > 0);
     
     if (names.length === 0) {
       statusMsg.style.color = '#d32f2f';
@@ -106,7 +108,8 @@
 
     for (let i = 0; i < names.length; i++) {
       let rawName = names[i];
-      let cleanName = rawName.replace(/\b\w/g, char => char.toUpperCase());
+      // Clean trailing comma if present at the very end of the line
+      let cleanName = rawName.replace(/,\s*$/, '');
       
       statusMsg.innerText = `Processing (${i + 1}/${names.length}): ${cleanName}`;
 
@@ -144,18 +147,21 @@
       doc.setFontSize(18);
       doc.setTextColor(26, 26, 26);
       
-      // Adjusted positioning coordinates to sit perfectly centered in the blank line space
+      // Coordinates for text placement
       const nameX = 148.5; // Exact horizontal center of A4 landscape (297mm / 2)
-      const nameY = 125.2; // Nudged down slightly for ideal alignment
+      const nameY = 124.5; // Vertical position centered in the blank line space
       
       doc.text(cleanName, nameX, nameY, { align: 'center' });
 
       const pdfArrayBuffer = doc.output('arraybuffer');
       
+      // Create a clean filename replacing special characters
+      let safeFilename = cleanName.replace(/[^a-zA-Z0-9]/g, '_') + '_Certificate.pdf';
+
       if (names.length === 1) {
-        pdfBlobs.push({ name: cleanName + '_Certificate.pdf', data: pdfArrayBuffer });
+        pdfBlobs.push({ name: safeFilename, data: pdfArrayBuffer });
       } else {
-        zip.file(`${cleanName}_Certificate.pdf`, pdfArrayBuffer);
+        zip.file(safeFilename, pdfArrayBuffer);
       }
     }
 
